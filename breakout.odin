@@ -2,6 +2,8 @@ package breakout
 
 import "core:math"
 import "core:math/linalg"
+import "core:fmt"
+
 import rl "vendor:raylib"
 
 SCREEN_SIZE :: 400;
@@ -43,17 +45,26 @@ blockColorValues := [BlockColor]rl.Color {
     .RED = {250, 90, 85, 255}
 }
 
+blockColorScore := [BlockColor]int {
+    .YELLOW = 2,
+    .GREEN = 4,
+    .PURPLE = 6,
+    .RED = 8
+}
+
 blocks: [NUM_BLOCKS_X][NUM_BLOCKS_Y]bool;
 playerPosX: f32;
 ballPos: rl.Vector2;
 ballDir: rl.Vector2;
 started: bool;
+score: int;
 
 restart :: proc()
 {
     playerPosX = SCREEN_SIZE / 2 - PLAYER_WIDTH / 2;
     ballPos = {SCREEN_SIZE / 2, BALL_START_Y};
     started = false;
+    score = 0;
 
     for x in 0..<NUM_BLOCKS_X
     {
@@ -239,6 +250,8 @@ main :: proc()
                     }
 
                     blocks[x][y] = false;
+                    rowColor := rowColors[y];
+                    score += blockColorScore[rowColor];
                     break blockXLoop;
                 }
             }
@@ -280,8 +293,13 @@ main :: proc()
             }
         }
 
+        scoreText := fmt.ctprint(score);
+        rl.DrawText(scoreText, 5, 5, 10, rl.WHITE);
+
         rl.EndMode2D();
         rl.EndDrawing();
+
+        free_all(context.temp_allocator);
     }
 
     rl.CloseWindow();
