@@ -10,11 +10,18 @@ PLAYER_POS_Y :: 340;
 
 playerPosX: f32;
 
+restart :: proc()
+{
+    playerPosX = SCREEN_SIZE / 2 - PLAYER_WIDTH / 2;
+}
+
 main :: proc()
 {
     rl.SetConfigFlags({.VSYNC_HINT});
     rl.InitWindow(800, 800, "Breakout");
     rl.SetTargetFPS(240);
+
+    restart();
 
     for !rl.WindowShouldClose()
     {
@@ -34,7 +41,7 @@ main :: proc()
         playerPosX = clamp(playerPosX, 0, SCREEN_SIZE - PLAYER_WIDTH);
 
         rl.BeginDrawing();
-        rl.ClearBackground(rl.WHITE);
+        rl.ClearBackground({150, 190, 220, 255});
 
         camera: rl.Camera2D = {
             zoom = f32(rl.GetScreenHeight() / SCREEN_SIZE)
