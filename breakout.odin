@@ -3,6 +3,7 @@ package breakout
 import "core:math"
 import "core:math/linalg"
 import "core:fmt"
+import "core:math/rand"
 
 import rl "vendor:raylib"
 
@@ -107,7 +108,15 @@ main :: proc()
 {
     rl.SetConfigFlags({.VSYNC_HINT});
     rl.InitWindow(800, 800, "Breakout");
+    rl.InitAudioDevice();
     rl.SetTargetFPS(240);
+
+    ballTexture := rl.LoadTexture("assets/ball.png");
+    playerTexture := rl.LoadTexture("assets/player.png");
+
+    hitBlockSound := rl.LoadSound("assets/hit_block.wav");
+    hitPlayerSound := rl.LoadSound("assets/hit_player.wav");
+    gameOverSound := rl.LoadSound("assets/game_over.wav");
 
     restart();
 
@@ -163,6 +172,7 @@ main :: proc()
         if !gameOver && ballPos.y > SCREEN_SIZE + BALL_RADIUS * 6
         {
             gameOver = true;
+            rl.PlaySound(gameOverSound);
         }
 
         playerVelocity: f32;
@@ -210,6 +220,9 @@ main :: proc()
             {
                 ballDir = reflect(ballDir, collisionNormal);
             }
+
+            rl.SetSoundPitch(hitPlayerSound, rand.float32_range(0.8, 1.2));
+            rl.PlaySound(hitPlayerSound);
         }
 
         blockXLoop: for x in 0..<NUM_BLOCKS_X
@@ -261,6 +274,8 @@ main :: proc()
                     blocks[x][y] = false;
                     rowColor := rowColors[y];
                     score += blockColorScore[rowColor];
+                    rl.SetSoundPitch(hitBlockSound, rand.float32_range(0.8, 1.2));
+                    rl.PlaySound(hitBlockSound);
                     break blockXLoop;
                 }
             }
@@ -275,8 +290,8 @@ main :: proc()
 
         rl.BeginMode2D(camera);
 
-        rl.DrawRectangleRec(playerRect, {50, 150, 90, 255});
-        rl.DrawCircleV(ballPos, BALL_RADIUS, {200, 90, 20, 255});
+        rl.DrawTextureV(playerTexture, {playerPosX, PLAYER_POS_Y}, rl.WHITE);
+        rl.DrawTextureV(ballTexture, ballPos - {BALL_RADIUS, BALL_RADIUS}, rl.WHITE);
 
         for x in 0..<NUM_BLOCKS_X
         {
@@ -325,5 +340,6 @@ main :: proc()
         free_all(context.temp_allocator);
     }
 
+    rl.CloseAudioDevice();
     rl.CloseWindow();
 }
