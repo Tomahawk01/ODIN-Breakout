@@ -55,16 +55,21 @@ blockColorScore := [BlockColor]int {
 
 blocks: [NUM_BLOCKS_X][NUM_BLOCKS_Y]bool;
 playerPosX: f32;
+prevPlayerPosX: f32;
 ballPos: rl.Vector2;
+prevBallPos: rl.Vector2;
 ballDir: rl.Vector2;
 started: bool;
 gameOver: bool;
 score: int;
+accumulatedTime: f32;
 
 restart :: proc()
 {
     playerPosX = SCREEN_SIZE / 2 - PLAYER_WIDTH / 2;
+    prevPlayerPosX = playerPosX;
     ballPos = {SCREEN_SIZE / 2, BALL_START_Y};
+    prevBallPos = ballPos;
     started = false;
     gameOver = false;
     score = 0;
@@ -122,7 +127,7 @@ main :: proc()
 
     for !rl.WindowShouldClose()
     {
-        dt: f32;
+        DT :: 1.0 / 60.0; // 16ms
 
         if !started
         {
@@ -130,6 +135,8 @@ main :: proc()
                 SCREEN_SIZE / 2 + f32(math.cos(rl.GetTime()) * SCREEN_SIZE / 2.5),
                 BALL_START_Y
             };
+
+            prevBallPos = ballPos;
 
             if rl.IsKeyPressed(.SPACE)
             {
@@ -148,138 +155,148 @@ main :: proc()
         }
         else
         {
-            dt = rl.GetFrameTime();
+            accumulatedTime += rl.GetFrameTime();
         }
 
-        prevBallPos := ballPos;
-        ballPos += ballDir * BALL_SPEED * dt;
+        for accumulatedTime >= DT
+        {
+            prevBallPos = ballPos;
+            prevPlayerPosX = playerPosX;
+            ballPos += ballDir * BALL_SPEED * DT;
 
-        if ballPos.x + BALL_RADIUS > SCREEN_SIZE
-        {
-            ballPos.x = SCREEN_SIZE - BALL_RADIUS;
-            ballDir = reflect(ballDir, {-1, 0});
-        }
-        if ballPos.x - BALL_RADIUS < 0
-        {
-            ballPos.x = BALL_RADIUS;
-            ballDir = reflect(ballDir, {1, 0});
-        }
-        if ballPos.y - BALL_RADIUS < 0
-        {
-            ballPos.y = BALL_RADIUS;
-            ballDir = reflect(ballDir, {0, 1});
-        }
-        if !gameOver && ballPos.y > SCREEN_SIZE + BALL_RADIUS * 6
-        {
-            gameOver = true;
-            rl.PlaySound(gameOverSound);
-        }
-
-        playerVelocity: f32;
-
-        if rl.IsKeyDown(.LEFT)
-        {
-            playerVelocity -= PLAYER_SPEED;
-        }
-        if rl.IsKeyDown(.RIGHT)
-        {
-            playerVelocity += PLAYER_SPEED;
-        }
-        playerPosX += playerVelocity * dt;
-        playerPosX = clamp(playerPosX, 0, SCREEN_SIZE - PLAYER_WIDTH);
-
-        playerRect := rl.Rectangle{
-            playerPosX, PLAYER_POS_Y,
-            PLAYER_WIDTH, PLAYER_HEIGHT
-        };
-
-        if rl.CheckCollisionCircleRec(ballPos, BALL_RADIUS, playerRect)
-        {
-            collisionNormal: rl.Vector2;
-
-            if prevBallPos.y < playerRect.y + playerRect.height
+            if ballPos.x + BALL_RADIUS > SCREEN_SIZE
             {
-                collisionNormal += {0, -1};
-                ballPos.y = playerRect.y - BALL_RADIUS;
+                ballPos.x = SCREEN_SIZE - BALL_RADIUS;
+                ballDir = reflect(ballDir, {-1, 0});
             }
-            if prevBallPos.y > playerRect.y + playerRect.height
+            if ballPos.x - BALL_RADIUS < 0
             {
-                collisionNormal += {0, 1};
-                ballPos.y = playerRect.y + playerRect.height + BALL_RADIUS;
+                ballPos.x = BALL_RADIUS;
+                ballDir = reflect(ballDir, {1, 0});
             }
-            if prevBallPos.x < playerRect.x
+            if ballPos.y - BALL_RADIUS < 0
             {
-                collisionNormal += {-1, 0};
+                ballPos.y = BALL_RADIUS;
+                ballDir = reflect(ballDir, {0, 1});
             }
-            if prevBallPos.x > playerRect.x + playerRect.width
+            if !gameOver && ballPos.y > SCREEN_SIZE + BALL_RADIUS * 6
             {
-                collisionNormal += {1, 0};
+                gameOver = true;
+                rl.PlaySound(gameOverSound);
             }
 
-            if collisionNormal != 0
+            playerVelocity: f32;
+
+            if rl.IsKeyDown(.LEFT)
             {
-                ballDir = reflect(ballDir, collisionNormal);
+                playerVelocity -= PLAYER_SPEED;
             }
-
-            rl.SetSoundPitch(hitPlayerSound, rand.float32_range(0.8, 1.2));
-            rl.PlaySound(hitPlayerSound);
-        }
-
-        blockXLoop: for x in 0..<NUM_BLOCKS_X
-        {
-            for y in 0..<NUM_BLOCKS_Y
+            if rl.IsKeyDown(.RIGHT)
             {
-                if blocks[x][y] == false
+                playerVelocity += PLAYER_SPEED;
+            }
+            playerPosX += playerVelocity * DT;
+            playerPosX = clamp(playerPosX, 0, SCREEN_SIZE - PLAYER_WIDTH);
+
+            playerRect := rl.Rectangle{
+                playerPosX, PLAYER_POS_Y,
+                PLAYER_WIDTH, PLAYER_HEIGHT
+            };
+
+            if rl.CheckCollisionCircleRec(ballPos, BALL_RADIUS, playerRect)
+            {
+                collisionNormal: rl.Vector2;
+
+                if prevBallPos.y < playerRect.y + playerRect.height
                 {
-                    continue;
+                    collisionNormal += {0, -1};
+                    ballPos.y = playerRect.y - BALL_RADIUS;
+                }
+                if prevBallPos.y > playerRect.y + playerRect.height
+                {
+                    collisionNormal += {0, 1};
+                    ballPos.y = playerRect.y + playerRect.height + BALL_RADIUS;
+                }
+                if prevBallPos.x < playerRect.x
+                {
+                    collisionNormal += {-1, 0};
+                }
+                if prevBallPos.x > playerRect.x + playerRect.width
+                {
+                    collisionNormal += {1, 0};
                 }
 
-                blockRect := calcBlockRect(x, y);
-
-                if rl.CheckCollisionCircleRec(ballPos, BALL_RADIUS, blockRect)
+                if collisionNormal != 0
                 {
-                    collisionNormal: rl.Vector2;
+                    ballDir = reflect(ballDir, collisionNormal);
+                }
 
-                    if prevBallPos.y < blockRect.y
+                rl.SetSoundPitch(hitPlayerSound, rand.float32_range(0.8, 1.2));
+                rl.PlaySound(hitPlayerSound);
+            }
+
+            blockXLoop: for x in 0..<NUM_BLOCKS_X
+            {
+                for y in 0..<NUM_BLOCKS_Y
+                {
+                    if blocks[x][y] == false
                     {
-                        collisionNormal += {0, -1};
-                    }
-                    if prevBallPos.y > blockRect.y + blockRect.height
-                    {
-                        collisionNormal += {0, 1};
-                    }
-                    if prevBallPos.x < blockRect.x
-                    {
-                        collisionNormal += {-1, 0};
-                    }
-                    if prevBallPos.x > blockRect.x + blockRect.width
-                    {
-                        collisionNormal += {1, 0};
+                        continue;
                     }
 
-                    if blockExists(x + int(collisionNormal.x), y)
-                    {
-                        collisionNormal.x = 0;
-                    }
-                    if blockExists(x, y + int(collisionNormal.y))
-                    {
-                        collisionNormal.y = 0;
-                    }
+                    blockRect := calcBlockRect(x, y);
 
-                    if collisionNormal != 0
+                    if rl.CheckCollisionCircleRec(ballPos, BALL_RADIUS, blockRect)
                     {
-                        ballDir = reflect(ballDir, collisionNormal);
-                    }
+                        collisionNormal: rl.Vector2;
 
-                    blocks[x][y] = false;
-                    rowColor := rowColors[y];
-                    score += blockColorScore[rowColor];
-                    rl.SetSoundPitch(hitBlockSound, rand.float32_range(0.8, 1.2));
-                    rl.PlaySound(hitBlockSound);
-                    break blockXLoop;
+                        if prevBallPos.y < blockRect.y
+                        {
+                            collisionNormal += {0, -1};
+                        }
+                        if prevBallPos.y > blockRect.y + blockRect.height
+                        {
+                            collisionNormal += {0, 1};
+                        }
+                        if prevBallPos.x < blockRect.x
+                        {
+                            collisionNormal += {-1, 0};
+                        }
+                        if prevBallPos.x > blockRect.x + blockRect.width
+                        {
+                            collisionNormal += {1, 0};
+                        }
+
+                        if blockExists(x + int(collisionNormal.x), y)
+                        {
+                            collisionNormal.x = 0;
+                        }
+                        if blockExists(x, y + int(collisionNormal.y))
+                        {
+                            collisionNormal.y = 0;
+                        }
+
+                        if collisionNormal != 0
+                        {
+                            ballDir = reflect(ballDir, collisionNormal);
+                        }
+
+                        blocks[x][y] = false;
+                        rowColor := rowColors[y];
+                        score += blockColorScore[rowColor];
+                        rl.SetSoundPitch(hitBlockSound, rand.float32_range(0.8, 1.2));
+                        rl.PlaySound(hitBlockSound);
+                        break blockXLoop;
+                    }
                 }
             }
+
+            accumulatedTime -= DT;
         }
+
+        blend := accumulatedTime / DT;
+        ballRenderPos := math.lerp(prevBallPos, ballPos, blend);
+        playerRenderPosX := math.lerp(prevPlayerPosX, playerPosX, blend);
 
         rl.BeginDrawing();
         rl.ClearBackground({150, 190, 220, 255});
@@ -290,8 +307,8 @@ main :: proc()
 
         rl.BeginMode2D(camera);
 
-        rl.DrawTextureV(playerTexture, {playerPosX, PLAYER_POS_Y}, rl.WHITE);
-        rl.DrawTextureV(ballTexture, ballPos - {BALL_RADIUS, BALL_RADIUS}, rl.WHITE);
+        rl.DrawTextureV(playerTexture, {playerRenderPosX, PLAYER_POS_Y}, rl.WHITE);
+        rl.DrawTextureV(ballTexture, ballRenderPos - {BALL_RADIUS, BALL_RADIUS}, rl.WHITE);
 
         for x in 0..<NUM_BLOCKS_X
         {
