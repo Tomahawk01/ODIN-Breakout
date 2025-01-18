@@ -57,6 +57,7 @@ playerPosX: f32;
 ballPos: rl.Vector2;
 ballDir: rl.Vector2;
 started: bool;
+gameOver: bool;
 score: int;
 
 restart :: proc()
@@ -64,6 +65,7 @@ restart :: proc()
     playerPosX = SCREEN_SIZE / 2 - PLAYER_WIDTH / 2;
     ballPos = {SCREEN_SIZE / 2, BALL_START_Y};
     started = false;
+    gameOver = false;
     score = 0;
 
     for x in 0..<NUM_BLOCKS_X
@@ -128,6 +130,13 @@ main :: proc()
                 started = true;
             }
         }
+        else if gameOver
+        {
+            if rl.IsKeyPressed(.SPACE)
+            {
+                restart();
+            }
+        }
         else
         {
             dt = rl.GetFrameTime();
@@ -151,9 +160,9 @@ main :: proc()
             ballPos.y = BALL_RADIUS;
             ballDir = reflect(ballDir, {0, 1});
         }
-        if ballPos.y > SCREEN_SIZE + BALL_RADIUS * 6
+        if !gameOver && ballPos.y > SCREEN_SIZE + BALL_RADIUS * 6
         {
-            restart();
+            gameOver = true;
         }
 
         playerVelocity: f32;
@@ -295,6 +304,20 @@ main :: proc()
 
         scoreText := fmt.ctprint(score);
         rl.DrawText(scoreText, 5, 5, 10, rl.WHITE);
+
+        if !started
+        {
+            startText := fmt.ctprint("Start: Space");
+            startTextWidth := rl.MeasureText(startText, 15);
+            rl.DrawText(startText, SCREEN_SIZE / 2 - startTextWidth / 2, BALL_START_Y - 30, 15, rl.WHITE);
+        }
+
+        if gameOver
+        {
+            gameOverText := fmt.ctprintf("Score: %v. Restart: Space", score);
+            gameOverTextWidth := rl.MeasureText(gameOverText, 15);
+            rl.DrawText(gameOverText, SCREEN_SIZE / 2 - gameOverTextWidth / 2, BALL_START_Y - 30, 15, rl.WHITE);
+        }
 
         rl.EndMode2D();
         rl.EndDrawing();
