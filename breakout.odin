@@ -25,6 +25,12 @@ restart :: proc()
     started = false;
 }
 
+reflect :: proc(dir: rl.Vector2, normal: rl.Vector2) -> rl.Vector2
+{
+    newDir := linalg.reflect(dir, linalg.normalize(normal));
+    return linalg.normalize(newDir);
+}
+
 main :: proc()
 {
     rl.SetConfigFlags({.VSYNC_HINT});
@@ -40,7 +46,7 @@ main :: proc()
         if !started
         {
             ballPos = {
-                SCREEN_SIZE / 2 + f32(math.cos(rl.GetTime())) * SCREEN_SIZE / 2.5,
+                SCREEN_SIZE / 2 + f32(math.cos(rl.GetTime()) * SCREEN_SIZE / 2.5),
                 BALL_START_Y
             };
 
@@ -57,7 +63,29 @@ main :: proc()
             dt = rl.GetFrameTime();
         }
 
+        prevBallPos := ballPos;
         ballPos += ballDir * BALL_SPEED * dt;
+
+        if ballPos.x + BALL_RADIUS > SCREEN_SIZE
+        {
+            ballPos.x = SCREEN_SIZE - BALL_RADIUS;
+            ballDir = reflect(ballDir, {-1, 0});
+        }
+        if ballPos.x - BALL_RADIUS < 0
+        {
+            ballPos.x = BALL_RADIUS;
+            ballDir = reflect(ballDir, {1, 0});
+        }
+        if ballPos.y - BALL_RADIUS < 0
+        {
+            ballPos.y = BALL_RADIUS;
+            ballDir = reflect(ballDir, {0, 1});
+        }
+        if ballPos.y > SCREEN_SIZE + BALL_RADIUS * 6
+        {
+            restart();
+        }
+
         playerVelocity: f32;
 
         if rl.IsKeyDown(.LEFT)
@@ -71,6 +99,40 @@ main :: proc()
         playerPosX += playerVelocity * dt;
         playerPosX = clamp(playerPosX, 0, SCREEN_SIZE - PLAYER_WIDTH);
 
+        playerRect := rl.Rectangle{
+            playerPosX, PLAYER_POS_Y,
+            PLAYER_WIDTH, PLAYER_HEIGHT
+        };
+
+        if rl.CheckCollisionCircleRec(ballPos, BALL_RADIUS, playerRect)
+        {
+            collisionNormal: rl.Vector2;
+
+            if prevBallPos.y < playerRect.y + playerRect.height
+            {
+                collisionNormal += {0, -1};
+                ballPos.y = playerRect.y - BALL_RADIUS;
+            }
+            if prevBallPos.y > playerRect.y + playerRect.height
+            {
+                collisionNormal += {0, 1};
+                ballPos.y = playerRect.y + playerRect.height + BALL_RADIUS;
+            }
+            if prevBallPos.x < playerRect.x
+            {
+                collisionNormal += {-1, 0};
+            }
+            if prevBallPos.x > playerRect.x + playerRect.width
+            {
+                collisionNormal += {1, 0};
+            }
+
+            if collisionNormal != 0
+            {
+                ballDir = reflect(ballDir, collisionNormal);
+            }
+        }
+
         rl.BeginDrawing();
         rl.ClearBackground({150, 190, 220, 255});
 
@@ -80,10 +142,6 @@ main :: proc()
 
         rl.BeginMode2D(camera);
 
-        playerRect := rl.Rectangle{
-            playerPosX, PLAYER_POS_Y,
-            PLAYER_WIDTH, PLAYER_HEIGHT
-        };
         rl.DrawRectangleRec(playerRect, {50, 150, 90, 255});
         rl.DrawCircleV(ballPos, BALL_RADIUS, {200, 90, 20, 255});
 
